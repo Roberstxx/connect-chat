@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { X, UserPlus, Copy, Check, Users } from 'lucide-react';
 import StatusDot from './StatusDot';
@@ -10,14 +10,18 @@ interface GroupInfoPanelProps {
 }
 
 export default function GroupInfoPanel({ open, onClose }: GroupInfoPanelProps) {
-  const { activeChat, allUsers, user } = useApp();
+  const { activeChat, allUsers, user, inviteToGroup } = useApp();
   const [tab, setTab] = useState<'members' | 'invite'>('members');
   const [copied, setCopied] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
+  const inviteCode = useMemo(
+    () => activeChat ? `CHAT-${activeChat.id.toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}` : '',
+    [activeChat?.id]
+  );
+
   if (!open || !activeChat) return null;
 
-  const inviteCode = `CHAT-${activeChat.id.toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const memberIds = new Set(activeChat.members.map((m) => m.id));
   const availableUsers = allUsers.filter((u) => !memberIds.has(u.id));
 
@@ -34,9 +38,8 @@ export default function GroupInfoPanel({ open, onClose }: GroupInfoPanelProps) {
   };
 
   const handleInviteSelected = () => {
-    // TODO: wsService.send('group:invite', { groupId: activeChat.id, userId }) for each selected
+    inviteToGroup(activeChat.id, selectedUsers);
     setSelectedUsers([]);
-    onClose();
   };
 
   return (
@@ -69,7 +72,7 @@ export default function GroupInfoPanel({ open, onClose }: GroupInfoPanelProps) {
             tab === 'members' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
           }`}
         >
-          Miembros
+          Miembros ({activeChat.members.length})
         </button>
         <button
           onClick={() => setTab('invite')}
@@ -112,7 +115,7 @@ export default function GroupInfoPanel({ open, onClose }: GroupInfoPanelProps) {
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-2">Seleccionar usuarios</label>
               {availableUsers.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No hay más usuarios disponibles</p>
+                <p className="text-xs text-muted-foreground text-center py-4">Todos los usuarios ya son miembros</p>
               ) : (
                 <div className="space-y-1">
                   {availableUsers.map((u) => (

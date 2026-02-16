@@ -3,12 +3,14 @@ import { useApp } from '@/contexts/AppContext';
 import { Chat } from '@/types';
 import { Search, Plus, Users, MessageSquare, LogOut } from 'lucide-react';
 import StatusDot from './StatusDot';
+import StatusSelector from './StatusSelector';
 
 interface ChatSidebarProps {
   onNewGroup: () => void;
+  onNewDirect: () => void;
 }
 
-export default function ChatSidebar({ onNewGroup }: ChatSidebarProps) {
+export default function ChatSidebar({ onNewGroup, onNewDirect }: ChatSidebarProps) {
   const { user, chats, activeChat, setActiveChat, logout } = useApp();
   const [tab, setTab] = useState<'direct' | 'group'>('direct');
   const [search, setSearch] = useState('');
@@ -24,7 +26,7 @@ export default function ChatSidebar({ onNewGroup }: ChatSidebarProps) {
   };
 
   return (
-    <aside className="w-80 h-full flex flex-col bg-card border-r border-border">
+    <aside className="w-80 h-full flex flex-col bg-card border-r border-border shrink-0">
       {/* Profile */}
       <div className="p-4 border-b border-border flex items-center gap-3">
         <div className="relative">
@@ -35,7 +37,7 @@ export default function ChatSidebar({ onNewGroup }: ChatSidebarProps) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{user?.displayName}</p>
-          <p className="text-xs text-muted-foreground">@{user?.username}</p>
+          <StatusSelector />
         </div>
         <button onClick={logout} className="p-2 rounded-lg hover:bg-muted transition-colors" aria-label="Cerrar sesión">
           <LogOut className="w-4 h-4 text-muted-foreground" />
@@ -103,7 +105,7 @@ export default function ChatSidebar({ onNewGroup }: ChatSidebarProps) {
       {/* New button */}
       <div className="p-3 border-t border-border">
         <button
-          onClick={tab === 'group' ? onNewGroup : () => {}}
+          onClick={tab === 'group' ? onNewGroup : onNewDirect}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
           aria-label={tab === 'group' ? 'Nuevo grupo' : 'Nuevo chat'}
         >

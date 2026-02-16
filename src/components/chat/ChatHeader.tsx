@@ -1,5 +1,6 @@
 import { useApp } from '@/contexts/AppContext';
 import { Phone, Video, Info, Users } from 'lucide-react';
+import StatusDot from './StatusDot';
 
 interface ChatHeaderProps {
   onToggleInfo?: () => void;
@@ -24,11 +25,14 @@ export default function ChatHeader({ onToggleInfo, infoOpen }: ChatHeaderProps) 
         </div>
         <div>
           <h2 className="text-sm font-semibold text-foreground">{activeChat.title}</h2>
-          <p className="text-xs text-muted-foreground">
-            {activeChat.type === 'group'
-              ? `${activeChat.members.length} miembros`
-              : otherMember?.status || 'offline'}
-          </p>
+          <div className="flex items-center gap-1.5">
+            {otherMember && <StatusDot status={otherMember.status} className="w-2 h-2" />}
+            <p className="text-xs text-muted-foreground">
+              {activeChat.type === 'group'
+                ? `${activeChat.members.length} miembros`
+                : otherMember?.status === 'online' ? 'En línea' : otherMember?.status === 'busy' ? 'Ocupado' : 'Desconectado'}
+            </p>
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-1">

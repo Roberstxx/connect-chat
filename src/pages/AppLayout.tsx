@@ -7,11 +7,14 @@ import MessageInput from '@/components/chat/MessageInput';
 import CallOverlay from '@/components/chat/CallOverlay';
 import GroupModal from '@/components/chat/GroupModal';
 import GroupInfoPanel from '@/components/chat/GroupInfoPanel';
+import DirectInfoPanel from '@/components/chat/DirectInfoPanel';
+import NewDirectChatModal from '@/components/chat/NewDirectChatModal';
 import { MessageSquare } from 'lucide-react';
 
 export default function AppLayout() {
   const { activeChat } = useApp();
   const [groupModal, setGroupModal] = useState(false);
+  const [directModal, setDirectModal] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
 
   // Close info panel when switching chats
@@ -21,7 +24,10 @@ export default function AppLayout() {
 
   return (
     <div className="h-screen flex bg-background">
-      <ChatSidebar onNewGroup={() => setGroupModal(true)} />
+      <ChatSidebar
+        onNewGroup={() => setGroupModal(true)}
+        onNewDirect={() => setDirectModal(true)}
+      />
 
       <main className="flex-1 flex min-w-0">
         <div className="flex-1 flex flex-col min-w-0">
@@ -48,10 +54,14 @@ export default function AppLayout() {
         {activeChat?.type === 'group' && (
           <GroupInfoPanel open={infoOpen} onClose={() => setInfoOpen(false)} />
         )}
+        {activeChat?.type === 'direct' && (
+          <DirectInfoPanel open={infoOpen} onClose={() => setInfoOpen(false)} />
+        )}
       </main>
 
       <CallOverlay />
       <GroupModal open={groupModal} onClose={() => setGroupModal(false)} />
+      <NewDirectChatModal open={directModal} onClose={() => setDirectModal(false)} />
     </div>
   );
 }
