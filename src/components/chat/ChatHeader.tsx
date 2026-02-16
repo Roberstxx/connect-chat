@@ -1,7 +1,12 @@
 import { useApp } from '@/contexts/AppContext';
 import { Phone, Video, Info, Users } from 'lucide-react';
 
-export default function ChatHeader() {
+interface ChatHeaderProps {
+  onToggleInfo?: () => void;
+  infoOpen?: boolean;
+}
+
+export default function ChatHeader({ onToggleInfo, infoOpen }: ChatHeaderProps) {
   const { activeChat, startCall } = useApp();
   if (!activeChat) return null;
 
@@ -41,8 +46,12 @@ export default function ChatHeader() {
         >
           <Video className="w-4 h-4 text-muted-foreground" />
         </button>
-        <button className="p-2.5 rounded-lg hover:bg-muted transition-colors" aria-label="Info del chat">
-          <Info className="w-4 h-4 text-muted-foreground" />
+        <button
+          onClick={onToggleInfo}
+          className={`p-2.5 rounded-lg transition-colors ${infoOpen ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
+          aria-label="Info del chat"
+        >
+          <Info className="w-4 h-4" />
         </button>
       </div>
     </header>
