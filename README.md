@@ -60,6 +60,28 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Backend Java (WebSocket + WebRTC signaling)
+
+Se agregó un backend base en `backend-java/` con Spring Boot para:
+
+- login/register por WebSocket con JWT,
+- relay de señalización WebRTC (`rtc:signal`),
+- esquema MySQL completo para users/chats/messages/groups/rtc_sessions.
+
+### Variables frontend
+
+Crear `.env` con:
+
+```sh
+VITE_WS_URL=ws://localhost:8443/ws/chat
+```
+
+Si habilitas mkcert + SSL en backend:
+
+```sh
+VITE_WS_URL=wss://localhost:8443/ws/chat
+```
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
