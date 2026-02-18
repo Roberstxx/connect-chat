@@ -221,3 +221,18 @@ mvn test
 - Backend: `backend-java/src/main/java`
 - Config backend: `backend-java/src/main/resources/application.yml`
 - Schema DB: `backend-java/src/main/resources/db/schema.sql`
+
+
+## 12) Qué ahora sí sale desde DB (no mocks)
+
+Con backend encendido y DB conectada, estos flujos ya pegan a MySQL:
+- Registro e inicio de sesión (`auth:register`, `auth:login`) sobre tabla `users`.
+- Listado de chats del usuario (`chat:list`) sobre `chats` + `chat_members`.
+- Listado de usuarios (`user:list`) sobre `users`.
+- Envío y lectura de mensajes (`message:send`, `message:list`) sobre `messages`.
+- Creación de chat directo y grupo (`chat:createDirect`, `group:create`).
+
+Si ves datos viejos, borra `chat.jwt` del navegador y vuelve a iniciar sesión.
+
+---
+

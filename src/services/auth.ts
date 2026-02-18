@@ -37,10 +37,10 @@ export async function loginWithWs(usernameOrEmail: string, password: string): Pr
   return response;
 }
 
-export async function registerWithWs(username: string, displayName: string, password: string): Promise<AuthResponse> {
+export async function registerWithWs(username: string, displayName: string, email: string, password: string): Promise<AuthResponse> {
   await connectForAuth();
   const responsePromise = wsService.once<AuthResponse>('auth:register', 12000);
-  wsService.send('auth:register', { username, displayName, password });
+  wsService.send('auth:register', { username, displayName, email, password });
   const response = await responsePromise;
   localStorage.setItem(TOKEN_KEY, response.token);
   return response;

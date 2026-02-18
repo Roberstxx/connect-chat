@@ -96,3 +96,13 @@ server:
 ## Notas
 - La persistencia de usuarios/chats/mensajes está pensada para MySQL usando el esquema incluido.
 - La lógica de negocio de grupos y mensajes puede crecer sobre `ChatWebSocketHandler` o migrarse a STOMP.
+
+
+### Eventos con persistencia en DB
+- `chat:list`
+- `user:list`
+- `message:list`
+- `chat:createDirect`
+- `group:create`
+- `group:invite`
+- `message:send`

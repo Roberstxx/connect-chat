@@ -22,7 +22,7 @@ public class AuthService {
   }
 
   @Transactional
-  public User register(String username, String displayName, String password) {
+  public User register(String username, String displayName, String email, String password) {
     if (userRepository.existsByUsername(username)) {
       throw new IllegalArgumentException("username ya existe");
     }
@@ -31,6 +31,7 @@ public class AuthService {
     entity.setId(UUID.randomUUID().toString());
     entity.setUsername(username);
     entity.setDisplayName(displayName);
+    entity.setEmail(email);
     entity.setStatus("online");
     entity.setPasswordHash(encoder.encode(password));
 
