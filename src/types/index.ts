@@ -32,6 +32,8 @@ export interface RtcSignal {
   payload: any;
 }
 
+export type CallType = 'audio' | 'video';
+
 export type WsEvent =
   | 'auth:login'
   | 'auth:register'
