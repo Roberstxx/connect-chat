@@ -246,7 +246,9 @@ mvn test
 ## 10) Si algo falla (checklist rápido)
 
 - ¿La DB `chatapp` existe y el schema fue importado?
-- ¿Credenciales de DB correctas en `application.yml`?
+- ¿Credenciales `DB_*` correctas en tus variables de entorno/backend?
+- ¿Ves en logs de Spring que la conexión JDBC fue exitosa (sin `Access denied`)?
+- ¿Después de registrar, aparece un `INSERT`/nuevo registro en tabla `users`?
 - ¿`VITE_WS_URL` coincide con `ws://` o `wss://` según tu backend?
 - Si usas SSL: ¿`localhost.p12` está en `backend-java/src/main/resources/` y `ssl.enabled: true`?
 - ¿Backend corriendo en puerto `8443`?

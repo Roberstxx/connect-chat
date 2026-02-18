@@ -89,6 +89,10 @@ server:
 - `rtc:signal`
 - Cualquier otro evento se hace echo (útil para pruebas de frontend)
 
+## Estado de autenticación
+- `auth:register` y `auth:login` ahora leen/escriben en tabla `users` de MySQL (ya no en memoria).
+- Si no ves usuarios nuevos en phpMyAdmin, revisa primero credenciales `DB_*` y logs de arranque de Spring.
+
 ## Notas
 - La persistencia de usuarios/chats/mensajes está pensada para MySQL usando el esquema incluido.
 - La lógica de negocio de grupos y mensajes puede crecer sobre `ChatWebSocketHandler` o migrarse a STOMP.
