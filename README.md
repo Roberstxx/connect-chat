@@ -45,33 +45,89 @@ Para backend, Maven descarga dependencias automáticamente al correrlo.
 
 ```bash
 cd backend-java
-mysql -u root -p chatapp < src/main/resources/db/schema.sql
+mysql -u root chatapp < src/main/resources/db/schema.sql
 ```
 
 > Si tu usuario/clave de DB son diferentes, luego actualiza `backend-java/src/main/resources/application.yml`.
 
-Configuración actual por defecto del backend:
+Configuración actual por defecto del backend (pensada para XAMPP):
 - DB: `chatapp`
 - Usuario: `root`
-- Password: `root`
+- Password: *(vacío)*
 - Puerto DB: `3306`
 
 ---
 
-## 4) Configurar variables `.env` del frontend
+## 4) Configurar variables de entorno (`.env`)
 
-En la raíz del proyecto crea un archivo **`.env`**.
+### 4.1 Frontend (`/.env`)
 
-### Opción A: sin SSL (más simple para desarrollo)
+En la raíz del proyecto crea un archivo **`.env`**:
 
 ```env
 VITE_WS_URL=ws://localhost:8443/ws/chat
 ```
 
-### Opción B: con SSL/TLS local (WSS)
+Si habilitas TLS en backend, cambia a:
 
 ```env
 VITE_WS_URL=wss://localhost:8443/ws/chat
+```
+
+### 4.2 Backend (variables de entorno para Spring Boot)
+
+El backend ahora toma valores desde variables de entorno, con defaults compatibles con XAMPP.
+
+Variables principales:
+
+```env
+# DB (XAMPP por defecto)
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=chatapp
+DB_USERNAME=root
+DB_PASSWORD=
+DB_USE_SSL=false
+DB_TIMEZONE=UTC
+
+# Servidor
+SERVER_PORT=8443
+
+# JWT
+JWT_SECRET=dev-secret-change-this-to-32-plus-characters
+JWT_EXPIRATION_MS=86400000
+
+# SSL opcional
+SSL_ENABLED=false
+SSL_KEY_STORE=classpath:localhost.p12
+SSL_KEY_STORE_PASSWORD=changeit
+SSL_KEY_STORE_TYPE=PKCS12
+```
+
+> Nota: Spring Boot no carga `.env` automáticamente. Puedes exportar variables en tu terminal o pasar `-D` properties al ejecutar Maven.
+
+Ejemplo rápido en Linux/macOS:
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_NAME=chatapp
+export DB_USERNAME=root
+export DB_PASSWORD=
+cd backend-java
+mvn spring-boot:run
+```
+
+Ejemplo rápido en Windows PowerShell:
+
+```powershell
+$env:DB_HOST="localhost"
+$env:DB_PORT="3306"
+$env:DB_NAME="chatapp"
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD=""
+cd backend-java
+mvn spring-boot:run
 ```
 
 ---
@@ -190,7 +246,9 @@ mvn test
 ## 10) Si algo falla (checklist rápido)
 
 - ¿La DB `chatapp` existe y el schema fue importado?
-- ¿Credenciales de DB correctas en `application.yml`?
+- ¿Credenciales `DB_*` correctas en tus variables de entorno/backend?
+- ¿Ves en logs de Spring que la conexión JDBC fue exitosa (sin `Access denied`)?
+- ¿Después de registrar, aparece un `INSERT`/nuevo registro en tabla `users`?
 - ¿`VITE_WS_URL` coincide con `ws://` o `wss://` según tu backend?
 - Si usas SSL: ¿`localhost.p12` está en `backend-java/src/main/resources/` y `ssl.enabled: true`?
 - ¿Backend corriendo en puerto `8443`?
