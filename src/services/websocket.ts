@@ -29,42 +29,51 @@ class WebSocketService {
     }
 
     this.connectPromise = new Promise<void>((resolve) => {
-    try {
-      this.ws = new WebSocket(this.url);
-
-      this.ws.onopen = () => {
-        console.log('[WS] Connected');
-        this.connected = true;
-        this.reconnectDelay = 2000;
-        this._flushQueue();
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
         resolve();
       };
 
-      this.ws.onmessage = (event) => {
-        try {
-          const { event: evName, data } = JSON.parse(event.data);
-          this._emit(evName, data);
-        } catch (e) {
-          console.error('[WS] Parse error', e);
-        }
-      };
+      try {
+        this.ws = new WebSocket(this.url);
 
-      this.ws.onclose = () => {
-        console.log('[WS] Disconnected');
-        this.connected = false;
-        this.connectPromise = null;
+        this.ws.onopen = () => {
+          console.log('[WS] Connected');
+          this.connected = true;
+          this.reconnectDelay = 2000;
+          this._flushQueue();
+          settle();
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            const { event: evName, data } = JSON.parse(event.data);
+            this._emit(evName, data);
+          } catch (e) {
+            console.error('[WS] Parse error', e);
+          }
+        };
+
+        this.ws.onclose = () => {
+          console.log('[WS] Disconnected');
+          this.connected = false;
+          this.connectPromise = null;
+          this._scheduleReconnect();
+          settle();
+        };
+
+        this.ws.onerror = (err) => {
+          console.error('[WS] Error', err);
+          settle();
+        };
+      } catch (e) {
+        console.error('[WS] Connection failed', e);
         this._scheduleReconnect();
-      };
-
-      this.ws.onerror = (err) => {
-        console.error('[WS] Error', err);
-      };
-    } catch (e) {
-      console.error('[WS] Connection failed', e);
-      this._scheduleReconnect();
-      this.connectPromise = null;
-      resolve();
-    }
+        this.connectPromise = null;
+        settle();
+      }
     });
 
     return this.connectPromise;

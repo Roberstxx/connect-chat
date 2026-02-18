@@ -1,32 +1,38 @@
-# Connect Chat — Guía completa de instalación y ejecución
+# Connect Chat — Guía completa para correrlo sin errores (XAMPP + Spring + Vite)
 
-Este repositorio tiene **2 partes**:
-- **Frontend**: React + Vite (`/`)
-- **Backend**: Java Spring Boot con WebSocket (`/backend-java`)
+Esta guía está pensada para evitar los problemas más comunes reportados en este proyecto:
+- Backend que no conecta a MySQL.
+- Registro/Login que no persiste usuarios en la tabla `users`.
+- WebSocket con desconexiones por URL o token viejo.
 
 ---
 
-## 1) Requisitos (qué debes instalar)
+## 1) Arquitectura del proyecto
+
+Este repo tiene dos aplicaciones:
+
+- **Frontend**: React + Vite (carpeta raíz).
+- **Backend**: Spring Boot + WebSocket + JPA (carpeta `backend-java`).
+
+---
+
+## 2) Requisitos
 
 ### Frontend
-- **Node.js 20+** (recomendado LTS)
-- **npm** (viene con Node)
+- Node.js 20+
+- npm
 
 ### Backend
-- **Java 17+**
-- **Maven 3.9+**
-- **MySQL 8+** o **MariaDB 10.4+**
+- Java 17+
+- Maven 3.9+
+- MySQL 8+ o MariaDB (XAMPP usa MariaDB)
 
-### Opcional (si quieres HTTPS/WSS en local)
-- **mkcert**
-
-> Nota importante sobre "requirements.txt": este proyecto **no usa Python**, así que no hay `requirements.txt`.
-> - Las dependencias del frontend están en `package.json`.
-> - Las dependencias del backend están en `backend-java/pom.xml`.
+### Opcional (solo si quieres `wss://`)
+- mkcert
 
 ---
 
-## 2) Clonar e instalar dependencias
+## 3) Instalación
 
 ```bash
 git clone <TU_REPO>
@@ -34,119 +40,109 @@ cd connect-chat
 npm install
 ```
 
-Para backend, Maven descarga dependencias automáticamente al correrlo.
+> Si `npm install` falla por red/proxy, corrige eso primero porque Vite/Vitest dependen de paquetes npm.
 
 ---
 
-## 3) Configurar base de datos (`chatapp`)
+## 4) Base de datos (XAMPP)
 
-1. Levanta MySQL/MariaDB.
-2. Importa el esquema:
+1. Abre XAMPP y levanta **MySQL**.
+2. Crea DB `chatapp` (si no existe).
+3. Importa el schema:
 
 ```bash
 cd backend-java
-mysql -u root -p chatapp < src/main/resources/db/schema.sql
+mysql -u root chatapp < src/main/resources/db/schema.sql
 ```
 
-> Si tu usuario/clave de DB son diferentes, luego actualiza `backend-java/src/main/resources/application.yml`.
-
-Configuración actual por defecto del backend:
-- DB: `chatapp`
-- Usuario: `root`
-- Password: `root`
-- Puerto DB: `3306`
+En XAMPP normalmente:
+- `DB_USERNAME=root`
+- `DB_PASSWORD=` (vacío)
+- `DB_PORT=3306`
 
 ---
 
-## 4) Configurar variables `.env` del frontend
+## 5) Variables de entorno
 
-En la raíz del proyecto crea un archivo **`.env`**.
+### 5.1 Frontend (`/.env`)
 
-### Opción A: sin SSL (más simple para desarrollo)
+Crea `/.env` en la raíz:
 
 ```env
 VITE_WS_URL=ws://localhost:8443/ws/chat
 ```
 
-### Opción B: con SSL/TLS local (WSS)
+Si habilitas TLS en backend, usa:
 
 ```env
 VITE_WS_URL=wss://localhost:8443/ws/chat
 ```
 
----
+### 5.2 Backend (Spring Boot)
 
-## 5) (Opcional) Generar certificados locales con mkcert
+El backend lee estas variables (`application.yml`):
 
-Solo si quieres usar `wss://`.
+```env
+# DB (defaults útiles para XAMPP)
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=chatapp
+DB_USERNAME=root
+DB_PASSWORD=
+DB_USE_SSL=false
+DB_TIMEZONE=UTC
 
-### 5.1 Instalar autoridad local
+# Server
+SERVER_PORT=8443
 
-```bash
-mkcert -install
+# JWT
+JWT_SECRET=dev-secret-change-this-to-32-plus-characters
+JWT_EXPIRATION_MS=86400000
+
+# SSL opcional
+SSL_ENABLED=false
+SSL_KEY_STORE=classpath:localhost.p12
+SSL_KEY_STORE_PASSWORD=changeit
+SSL_KEY_STORE_TYPE=PKCS12
 ```
 
-### 5.2 Generar cert y key para localhost
-
-```bash
-mkcert localhost 127.0.0.1 ::1
-```
-
-Esto te genera dos archivos (nombres similares a):
-- `localhost+2.pem`
-- `localhost+2-key.pem`
-
-### 5.3 Convertir a `.p12` para Spring Boot
-
-Desde la carpeta donde quedaron los PEM:
-
-```bash
-openssl pkcs12 -export \
-  -in localhost+2.pem \
-  -inkey localhost+2-key.pem \
-  -out localhost.p12 \
-  -name localhost \
-  -password pass:changeit
-```
-
-### 5.4 Copiar `localhost.p12` al backend
-
-```bash
-cp localhost.p12 backend-java/src/main/resources/localhost.p12
-```
-
-### 5.5 Habilitar SSL en backend
-
-Edita `backend-java/src/main/resources/application.yml` y deja:
-
-```yaml
-server:
-  port: 8443
-  ssl:
-    enabled: true
-    key-store: classpath:localhost.p12
-    key-store-password: changeit
-    key-store-type: PKCS12
-```
+> Spring Boot no carga `.env` automáticamente. Debes exportar variables en tu terminal antes de correr `mvn spring-boot:run`.
 
 ---
 
-## 6) Correr backend (Spring Boot)
+## 6) Cómo arrancar (orden correcto)
 
-En una terminal:
+1. MySQL/MariaDB en XAMPP.
+2. Backend Spring Boot.
+3. Frontend Vite.
 
-```bash
+### Backend (Windows PowerShell)
+
+```powershell
+$env:DB_HOST="localhost"
+$env:DB_PORT="3306"
+$env:DB_NAME="chatapp"
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD=""
+$env:SERVER_PORT="8443"
 cd backend-java
 mvn spring-boot:run
 ```
 
-Endpoint WebSocket:
-- Sin SSL: `ws://localhost:8443/ws/chat`
-- Con SSL: `wss://localhost:8443/ws/chat`
+### Backend (Linux/macOS bash)
 
----
+```bash
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_NAME=chatapp
+export DB_USERNAME=root
+export DB_PASSWORD=
+export SERVER_PORT=8443
+cd backend-java
+mvn spring-boot:run
+```
 
-## 7) Correr frontend (Vite)
+### Frontend
 
 En otra terminal, desde la raíz:
 
@@ -154,17 +150,42 @@ En otra terminal, desde la raíz:
 npm run dev
 ```
 
-Vite normalmente abre en:
+Abre:
 - `http://localhost:5173`
 
 ---
 
-## 8) Orden recomendado de arranque
+## 7) Verificación rápida (importante)
 
-1. Base de datos MySQL/MariaDB.
-2. Backend (`mvn spring-boot:run`).
-3. Frontend (`npm run dev`).
-4. Abrir el navegador en `http://localhost:5173`.
+Cuando todo está bien:
+
+1. El backend arranca sin errores JDBC (`Access denied`, `Communications link failure`, etc.).
+2. El frontend conecta a `ws://localhost:8443/ws/chat`.
+3. Al registrar usuario en la UI, aparece una fila nueva en `chatapp.users` (phpMyAdmin).
+4. Luego login funciona usando esos mismos datos.
+
+---
+
+## 8) Troubleshooting real (errores típicos)
+
+### A) “No se crean cuentas en DB”
+Revisa en este orden:
+
+1. ¿Backend realmente está corriendo con las variables `DB_*` correctas?
+2. ¿La DB y la tabla `users` existen en `chatapp`?
+3. ¿El backend se conectó a otra DB distinta por variables de entorno previas?
+4. ¿Estás mirando la misma instancia MySQL en phpMyAdmin que usa Spring?
+
+### B) “WebSocket failed / connect-disconnect loop”
+
+- Asegura que `VITE_WS_URL` apunte al backend correcto.
+- Borra token viejo del navegador (DevTools > Application > Local Storage > `chat.jwt`) y vuelve a intentar login.
+- Verifica que backend y frontend estén en los puertos esperados (`8443` y `5173`).
+
+### C) “Access denied for user”
+
+- Corrige `DB_USERNAME` / `DB_PASSWORD`.
+- En XAMPP usualmente el password de `root` está vacío.
 
 ---
 
@@ -187,18 +208,14 @@ mvn test
 
 ---
 
-## 10) Si algo falla (checklist rápido)
+## 10) Notas de implementación
 
-- ¿La DB `chatapp` existe y el schema fue importado?
-- ¿Credenciales de DB correctas en `application.yml`?
-- ¿`VITE_WS_URL` coincide con `ws://` o `wss://` según tu backend?
-- Si usas SSL: ¿`localhost.p12` está en `backend-java/src/main/resources/` y `ssl.enabled: true`?
-- ¿Backend corriendo en puerto `8443`?
-- ¿Frontend corriendo en puerto `5173`?
+- El registro/login WebSocket (`auth:register`, `auth:login`) ahora persiste en MySQL tabla `users`.
+- Si no ves datos en DB, el problema es de conexión/config de entorno, no del flujo en memoria.
 
 ---
 
-## Estructura principal
+## 11) Estructura principal
 
 - Frontend: `src/`
 - Backend: `backend-java/src/main/java`
