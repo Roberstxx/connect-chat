@@ -13,16 +13,62 @@ Backend base en **Spring Boot** para manejar:
 
 ## 2) Base de datos
 ```bash
-mysql -u root -p chatapp < src/main/resources/db/schema.sql
+mysql -u root chatapp < src/main/resources/db/schema.sql
 ```
 
-## 3) Ejecutar en local
+> XAMPP normalmente usa `root` sin contraseña. Si tu caso es distinto, ajusta variables de entorno.
+
+
+## 3) Configurar variables de entorno (XAMPP/MySQL)
+
+El backend lee estas variables (con defaults):
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=chatapp
+DB_USERNAME=root
+DB_PASSWORD=
+DB_USE_SSL=false
+DB_TIMEZONE=UTC
+
+SERVER_PORT=8443
+JWT_SECRET=dev-secret-change-this-to-32-plus-characters
+JWT_EXPIRATION_MS=86400000
+
+SSL_ENABLED=false
+SSL_KEY_STORE=classpath:localhost.p12
+SSL_KEY_STORE_PASSWORD=changeit
+SSL_KEY_STORE_TYPE=PKCS12
+```
+
+Ejemplo (PowerShell):
+```powershell
+$env:DB_HOST="localhost"
+$env:DB_PORT="3306"
+$env:DB_NAME="chatapp"
+$env:DB_USERNAME="root"
+$env:DB_PASSWORD=""
+mvn spring-boot:run
+```
+
+Ejemplo (bash):
+```bash
+export DB_HOST=localhost
+export DB_PORT=3306
+export DB_NAME=chatapp
+export DB_USERNAME=root
+export DB_PASSWORD=
+mvn spring-boot:run
+```
+
+## 4) Ejecutar en local
 ```bash
 mvn spring-boot:run
 ```
 WebSocket endpoint: `ws://localhost:8443/ws/chat`
 
-## 4) Habilitar TLS local con mkcert
+## 5) Habilitar TLS local con mkcert
 ```bash
 mkcert -install
 mkcert localhost 127.0.0.1 ::1
@@ -37,7 +83,7 @@ server:
     key-store-type: PKCS12
 ```
 
-## 5) Eventos WebSocket soportados
+## 6) Eventos WebSocket soportados
 - `auth:register`
 - `auth:login`
 - `rtc:signal`
