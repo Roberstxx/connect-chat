@@ -136,6 +136,7 @@ export default function CallOverlay() {
     if (!inCall || !callChatId || !user?.id) return;
 
     let cancelled = false;
+    let stopLocalDetector: (() => void) | null = null;
 
     (async () => {
       try {
@@ -180,6 +181,7 @@ export default function CallOverlay() {
 
     return () => {
       cancelled = true;
+      stopLocalDetector?.();
     };
   }, [inCall, callType, callChatId, user?.id, isCallInitiator, peers, ensurePeerConnection, detectSpeaking]);
 
