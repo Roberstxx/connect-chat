@@ -25,10 +25,11 @@ export interface Message {
 }
 
 export interface RtcSignal {
-  type: 'offer' | 'answer' | 'ice';
+  type: 'offer' | 'answer' | 'ice' | 'end';
   chatId: string;
   fromUserId: string;
   toUserId?: string;
+  callType?: 'audio' | 'video';
   payload: any;
 }
 

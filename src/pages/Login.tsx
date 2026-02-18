@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
-import { currentUser } from '@/data/mock';
 import { MessageCircle } from 'lucide-react';
+import { loginWithWs } from '@/services/auth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { login } = useApp();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: typeof errors = {};
     if (!email.trim()) errs.email = 'El email o usuario es requerido';
@@ -20,9 +21,16 @@ export default function Login() {
       setErrors(errs);
       return;
     }
-    // TODO: wsService.send('auth:login', { usernameOrEmail: email, password });
-    login(currentUser);
-    navigate('/app');
+    try {
+      setSubmitting(true);
+      const { user } = await loginWithWs(email, password);
+      await login(user);
+      navigate('/app');
+    } catch (err) {
+      setErrors({ password: 'No se pudo iniciar sesión con el backend WebSocket.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -70,10 +78,11 @@ export default function Login() {
             </div>
             <button
               type="submit"
+              disabled={submitting}
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
               aria-label="Iniciar sesión"
             >
-              Iniciar sesión
+              {submitting ? 'Conectando...' : 'Iniciar sesión'}
             </button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-6">

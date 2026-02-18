@@ -1,6 +1,6 @@
 /**
  * WebSocket service with reconnection, typed events, and message queue.
- * TODO: Connect to your Python WebSocket backend.
+ * Built to integrate with a Java Spring Boot signaling backend.
  */
 
 import { WsEvent } from '@/types';
@@ -16,13 +16,19 @@ class WebSocketService {
   private reconnectDelay = 2000;
   private maxReconnectDelay = 30000;
   private connected = false;
+  private connectPromise: Promise<void> | null = null;
 
   connect(url: string) {
     this.url = url;
-    this._connect();
+    return this._connect();
   }
 
   private _connect() {
+    if (this.connectPromise && (this.connected || this.ws?.readyState === WebSocket.CONNECTING)) {
+      return this.connectPromise;
+    }
+
+    this.connectPromise = new Promise<void>((resolve) => {
     try {
       this.ws = new WebSocket(this.url);
 
@@ -31,6 +37,7 @@ class WebSocketService {
         this.connected = true;
         this.reconnectDelay = 2000;
         this._flushQueue();
+        resolve();
       };
 
       this.ws.onmessage = (event) => {
@@ -45,6 +52,7 @@ class WebSocketService {
       this.ws.onclose = () => {
         console.log('[WS] Disconnected');
         this.connected = false;
+        this.connectPromise = null;
         this._scheduleReconnect();
       };
 
@@ -54,7 +62,12 @@ class WebSocketService {
     } catch (e) {
       console.error('[WS] Connection failed', e);
       this._scheduleReconnect();
+      this.connectPromise = null;
+      resolve();
     }
+    });
+
+    return this.connectPromise;
   }
 
   private _scheduleReconnect() {
@@ -85,6 +98,21 @@ class WebSocketService {
     } else {
       this.queue.push({ event, payload });
     }
+  }
+
+  once<T = any>(event: string, timeoutMs = 10000): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        off();
+        reject(new Error(`Timeout waiting for ${event}`));
+      }, timeoutMs);
+
+      const off = this.on(event, (data) => {
+        clearTimeout(timer);
+        off();
+        resolve(data as T);
+      });
+    });
   }
 
   on(event: string, handler: WsHandler) {

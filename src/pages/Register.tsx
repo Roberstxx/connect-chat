@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
-import { currentUser } from '@/data/mock';
 import { MessageCircle } from 'lucide-react';
+import { registerWithWs } from '@/services/auth';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '', confirm: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useApp();
   const navigate = useNavigate();
 
@@ -15,7 +16,7 @@ export default function Register() {
     setErrors((p) => ({ ...p, [key]: '' }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!form.name.trim()) errs.name = 'El nombre es requerido';
@@ -24,9 +25,16 @@ export default function Register() {
     if (form.password.length < 4) errs.password = 'Mínimo 4 caracteres';
     if (form.password !== form.confirm) errs.confirm = 'Las contraseñas no coinciden';
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    // TODO: wsService.send('auth:register', { displayName: form.name, username: form.username, email: form.email, password: form.password });
-    login({ ...currentUser, displayName: form.name, username: form.username });
-    navigate('/app');
+    try {
+      setSubmitting(true);
+      const { user } = await registerWithWs(form.username, form.name, form.password);
+      await login(user);
+      navigate('/app');
+    } catch {
+      setErrors((prev) => ({ ...prev, password: 'No se pudo crear la cuenta en el backend.' }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const fields = [
@@ -69,10 +77,11 @@ export default function Register() {
             ))}
             <button
               type="submit"
+              disabled={submitting}
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
               aria-label="Crear cuenta"
             >
-              Crear cuenta
+              {submitting ? 'Creando...' : 'Crear cuenta'}
             </button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-6">

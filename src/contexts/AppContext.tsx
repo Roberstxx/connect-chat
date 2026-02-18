@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { User, Chat, Message, CallType } from '@/types';
 import { currentUser, mockChats, mockMessages, mockUsers } from '@/data/mock';
+import { wsService } from '@/services/websocket';
+import { connectWithToken, logoutAuth } from '@/services/auth';
 
 interface AppState {
   user: User | null;
@@ -13,7 +15,7 @@ interface AppState {
 }
 
 interface AppContextType extends AppState {
-  login: (user: User) => void;
+  login: (user: User) => Promise<void>;
   logout: () => void;
   setActiveChat: (chat: Chat | null) => void;
   sendMessage: (chatId: string, content: string, kind?: Message['kind']) => void;
@@ -39,11 +41,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     callType: null,
   });
 
-  const login = useCallback((user: User) => {
+  useEffect(() => {
+    const offMessage = wsService.on('message:receive', (incoming: Message) => {
+      setState((s) => ({
+        ...s,
+        messages: [...s.messages, incoming],
+        chats: s.chats.map((c) => (c.id === incoming.chatId ? { ...c, lastMessage: incoming } : c)),
+      }));
+    });
+
+    const offPresence = wsService.on('presence:update', ({ userId, status }: { userId: string; status: User['status'] }) => {
+      setState((s) => ({
+        ...s,
+        chats: s.chats.map((chat) => ({
+          ...chat,
+          members: chat.members.map((member) => (member.id === userId ? { ...member, status } : member)),
+        })),
+      }));
+    });
+
+    return () => {
+      offMessage();
+      offPresence();
+    };
+  }, []);
+
+  const login = useCallback(async (user: User) => {
+    await connectWithToken();
     setState((s) => ({ ...s, user }));
   }, []);
 
   const logout = useCallback(() => {
+    logoutAuth();
     setState((s) => ({ ...s, user: null, activeChat: null }));
   }, []);
 
@@ -67,17 +96,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         c.id === chatId ? { ...c, lastMessage: msg } : c
       ),
     }));
-    // TODO: wsService.send('message:send', { chatId, kind, content });
+    wsService.send('message:send', { chatId, kind, content });
   }, [state.user?.id]);
 
   const startCall = useCallback((chatId: string, type: CallType = 'video') => {
     setState((s) => ({ ...s, inCall: true, callChatId: chatId, callType: type }));
-    // TODO: wsService.send('rtc:signal', { type: 'offer', chatId, fromUserId: state.user?.id, payload: null });
+    wsService.send('rtc:signal', { type: 'offer', chatId, fromUserId: state.user?.id, payload: null, callType: type });
   }, []);
 
   const endCall = useCallback(() => {
+    if (state.callChatId) {
+      wsService.send('rtc:signal', { type: 'end', chatId: state.callChatId, fromUserId: state.user?.id, payload: null });
+    }
     setState((s) => ({ ...s, inCall: false, callChatId: null, callType: null }));
-  }, []);
+  }, [state.callChatId, state.user?.id]);
 
   const createGroup = useCallback((title: string, description?: string, memberIds: string[] = []) => {
     const me = state.user || currentUser;
@@ -90,10 +122,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       members: [me, ...invitedUsers],
     };
     setState((s) => ({ ...s, chats: [...s.chats, newChat], activeChat: newChat }));
-    // TODO: wsService.send('group:create', { title, description, memberIds });
+    wsService.send('group:create', { title, description, memberIds });
   }, [state.user]);
 
   const createDirectChat = useCallback((targetUserId: string) => {
+    wsService.send('chat:createDirect', { userId: targetUserId });
     setState((s) => {
       const me = s.user || currentUser;
       // Check if direct chat already exists
@@ -112,11 +145,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         members: [me, targetUser],
       };
       return { ...s, chats: [...s.chats, newChat], activeChat: newChat };
-      // TODO: wsService.send('chat:createDirect', { userId: targetUserId });
     });
   }, []);
 
   const inviteToGroup = useCallback((groupId: string, userIds: string[]) => {
+    wsService.send('group:invite', { groupId, userIds });
     setState((s) => {
       const usersToAdd = mockUsers.filter((u) => userIds.includes(u.id));
       const updatedChats = s.chats.map((c) => {
@@ -129,15 +162,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? updatedChats.find((c) => c.id === groupId) || s.activeChat
         : s.activeChat;
       return { ...s, chats: updatedChats, activeChat: updatedActive };
-      // TODO: wsService.send('group:invite', { groupId, userId }) for each
     });
   }, []);
 
   const updateStatus = useCallback((status: User['status']) => {
+    wsService.send('presence:update', { status });
     setState((s) => {
       if (!s.user) return s;
       return { ...s, user: { ...s.user, status } };
-      // TODO: wsService.send('presence:update', { status });
     });
   }, []);
 
