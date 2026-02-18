@@ -34,7 +34,23 @@ public class ChatDataService {
   public List<Map<String, Object>> listChatsForUser(String userId) {
     var chats = jdbc.query(
         """
-            SELECT c.id, c.type, c.title, c.description
+            SELECT
+              c.id,
+              c.type,
+              CASE
+                WHEN c.type = 'direct' THEN COALESCE(
+                  (
+                    SELECT u2.displayName
+                    FROM chat_members cm2
+                    JOIN users u2 ON u2.id = cm2.userId
+                    WHERE cm2.chatId = c.id AND cm2.userId <> ?
+                    LIMIT 1
+                  ),
+                  c.title
+                )
+                ELSE c.title
+              END AS title,
+              c.description
             FROM chats c
             JOIN chat_members cm ON cm.chatId = c.id
             WHERE cm.userId = ?
@@ -49,6 +65,7 @@ public class ChatDataService {
           chat.put("members", new ArrayList<Map<String, Object>>());
           return chat;
         },
+        userId,
         userId
     );
 
@@ -102,6 +119,14 @@ public class ChatDataService {
     return count != null && count > 0;
   }
 
+  private String userDisplayName(String userId) {
+    return jdbc.query(
+        "SELECT displayName FROM users WHERE id = ? LIMIT 1",
+        (rs, rowNum) -> rs.getString("displayName"),
+        userId
+    ).stream().findFirst().orElse("Direct chat");
+  }
+
   @Transactional
   public Map<String, Object> createDirectChat(String fromUserId, String targetUserId) {
     if (targetUserId == null || targetUserId.isBlank() || fromUserId.equals(targetUserId)) {
@@ -130,7 +155,7 @@ public class ChatDataService {
 
     String chatId = UUID.randomUUID().toString();
     jdbc.update("INSERT INTO chats (id, type, title, description) VALUES (?, 'direct', ?, NULL)",
-        chatId, "Direct chat");
+        chatId, userDisplayName(targetUserId));
     jdbc.update("INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, 'member')", chatId, fromUserId);
     jdbc.update("INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, 'member')", chatId, targetUserId);
     return chatById(chatId);
@@ -138,8 +163,13 @@ public class ChatDataService {
 
   @Transactional
   public Map<String, Object> createGroup(String ownerUserId, String title, String description, List<String> memberIds) {
+    String normalizedTitle = title == null ? "" : title.trim();
+    if (normalizedTitle.isBlank()) {
+      throw new IllegalArgumentException("título de grupo requerido");
+    }
+
     String chatId = UUID.randomUUID().toString();
-    jdbc.update("INSERT INTO chats (id, type, title, description) VALUES (?, 'group', ?, ?)", chatId, title, description);
+    jdbc.update("INSERT INTO chats (id, type, title, description) VALUES (?, 'group', ?, ?)", chatId, normalizedTitle, description);
     jdbc.update("INSERT INTO chat_members (chatId, userId, role) VALUES (?, ?, 'owner')", chatId, ownerUserId);
 
     for (String memberId : memberIds) {

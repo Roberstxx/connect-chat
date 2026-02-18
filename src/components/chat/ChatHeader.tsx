@@ -8,11 +8,11 @@ interface ChatHeaderProps {
 }
 
 export default function ChatHeader({ onToggleInfo, infoOpen }: ChatHeaderProps) {
-  const { activeChat, startCall } = useApp();
+  const { activeChat, startCall, user } = useApp();
   if (!activeChat) return null;
 
   const otherMember = activeChat.type === 'direct'
-    ? activeChat.members.find((m) => m.id !== 'u1')
+    ? activeChat.members.find((m) => m.id !== user?.id)
     : null;
 
   return (

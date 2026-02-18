@@ -97,6 +97,7 @@ export default function ChatSidebar({ onNewGroup, onNewDirect }: ChatSidebarProp
               active={activeChat?.id === chat.id}
               onClick={() => setActiveChat(chat)}
               formatTime={formatTime}
+              meId={user?.id}
             />
           ))
         )}
@@ -117,8 +118,8 @@ export default function ChatSidebar({ onNewGroup, onNewDirect }: ChatSidebarProp
   );
 }
 
-function ChatItem({ chat, active, onClick, formatTime }: { chat: Chat; active: boolean; onClick: () => void; formatTime: (ts?: number) => string }) {
-  const otherMember = chat.type === 'direct' ? chat.members.find((m) => m.id !== 'u1') : null;
+function ChatItem({ chat, active, onClick, formatTime, meId }: { chat: Chat; active: boolean; onClick: () => void; formatTime: (ts?: number) => string; meId?: string }) {
+  const otherMember = chat.type === 'direct' ? chat.members.find((m) => m.id !== meId) : null;
 
   return (
     <button
