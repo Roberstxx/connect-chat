@@ -8,12 +8,12 @@ Backend base en **Spring Boot** para manejar:
 ## 1) Requisitos
 - Java 17+
 - Maven 3.9+
-- MySQL 8+
+- MySQL 8+ (o MariaDB 10.4+)
 - mkcert (para HTTPS/WSS en local)
 
 ## 2) Base de datos
 ```bash
-mysql -u root -p < src/main/resources/db/schema.sql
+mysql -u root -p chatapp < src/main/resources/db/schema.sql
 ```
 
 ## 3) Ejecutar en local

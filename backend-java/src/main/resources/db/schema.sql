@@ -1,55 +1,50 @@
-CREATE DATABASE IF NOT EXISTS connect_chat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE connect_chat;
+CREATE DATABASE IF NOT EXISTS chatapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE chatapp;
 
 CREATE TABLE IF NOT EXISTS users (
-  id VARCHAR(36) PRIMARY KEY NOT NULL,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  display_name VARCHAR(100) NOT NULL,
-  avatar_url VARCHAR(500) NULL,
+  id CHAR(36) NOT NULL,
+  username VARCHAR(32) NOT NULL,
+  email VARCHAR(120) DEFAULT NULL,
+  displayName VARCHAR(80) NOT NULL,
+  avatarUrl TEXT DEFAULT NULL,
+  status ENUM('online','offline','busy') NOT NULL DEFAULT 'offline',
   password_hash VARCHAR(255) NOT NULL,
-  status ENUM('online','offline','busy') DEFAULT 'offline',
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
-);
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY username (username),
+  UNIQUE KEY email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS chats (
-  id VARCHAR(36) PRIMARY KEY NOT NULL,
+  id CHAR(36) NOT NULL,
   type ENUM('direct','group') NOT NULL,
-  title VARCHAR(150) NOT NULL,
-  description VARCHAR(500) NULL,
-  created_by VARCHAR(36) NULL,
-  created_at BIGINT NOT NULL,
-  CONSTRAINT fk_chats_created_by FOREIGN KEY (created_by) REFERENCES users(id)
-);
+  title VARCHAR(80) NOT NULL,
+  description TEXT DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS chat_members (
-  chat_id VARCHAR(36) NOT NULL,
-  user_id VARCHAR(36) NOT NULL,
-  joined_at BIGINT NOT NULL,
-  role ENUM('admin','member') DEFAULT 'member',
-  PRIMARY KEY (chat_id, user_id),
-  CONSTRAINT fk_chat_members_chat FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
-  CONSTRAINT fk_chat_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+  chatId CHAR(36) NOT NULL,
+  userId CHAR(36) NOT NULL,
+  role ENUM('owner','admin','member') NOT NULL DEFAULT 'member',
+  joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (chatId, userId),
+  KEY userId (userId),
+  CONSTRAINT chat_members_ibfk_1 FOREIGN KEY (chatId) REFERENCES chats (id) ON DELETE CASCADE,
+  CONSTRAINT chat_members_ibfk_2 FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS messages (
-  id VARCHAR(36) PRIMARY KEY NOT NULL,
-  chat_id VARCHAR(36) NOT NULL,
-  sender_id VARCHAR(36) NOT NULL,
+  id CHAR(36) NOT NULL,
+  chatId CHAR(36) NOT NULL,
+  senderId CHAR(36) NOT NULL,
   kind ENUM('text','emoji','object') NOT NULL,
   content TEXT NOT NULL,
-  created_at BIGINT NOT NULL,
-  CONSTRAINT fk_messages_chat FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
-  CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id)
-);
-
-CREATE TABLE IF NOT EXISTS rtc_sessions (
-  id VARCHAR(36) PRIMARY KEY NOT NULL,
-  chat_id VARCHAR(36),
-  type ENUM('audio','video') NOT NULL,
-  started_by VARCHAR(36),
-  started_at BIGINT NOT NULL,
-  ended_at BIGINT NULL,
-  CONSTRAINT fk_rtc_chat FOREIGN KEY (chat_id) REFERENCES chats(id),
-  CONSTRAINT fk_rtc_started_by FOREIGN KEY (started_by) REFERENCES users(id)
-);
+  createdAt BIGINT(20) NOT NULL,
+  PRIMARY KEY (id),
+  KEY senderId (senderId),
+  KEY idx_messages_chat_created (chatId, createdAt),
+  CONSTRAINT messages_ibfk_1 FOREIGN KEY (chatId) REFERENCES chats (id) ON DELETE CASCADE,
+  CONSTRAINT messages_ibfk_2 FOREIGN KEY (senderId) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
