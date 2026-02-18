@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { User, Chat, Message, CallType } from '@/types';
-import { currentUser, mockChats, mockMessages, mockUsers } from '@/data/mock';
 import { wsService } from '@/services/websocket';
 import { connectWithToken, logoutAuth } from '@/services/auth';
 
@@ -33,24 +32,50 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     user: null,
-    chats: mockChats,
-    messages: mockMessages,
+    chats: [],
+    messages: [],
     activeChat: null,
     inCall: false,
     callChatId: null,
     callType: null,
   });
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+
+  const loadChats = useCallback(async () => {
+    wsService.send('chat:list', {});
+    const chats = await wsService.once<Chat[]>('chat:list', 12000);
+    setState((s) => ({ ...s, chats, activeChat: s.activeChat ? chats.find((c) => c.id === s.activeChat!.id) || null : null }));
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    wsService.send('user:list', {});
+    const users = await wsService.once<User[]>('user:list', 12000);
+    setAllUsers(users);
+  }, []);
+
+  const loadMessagesForChat = useCallback(async (chatId: string) => {
+    wsService.send('message:list', { chatId, limit: 200 });
+    const msgs = await wsService.once<Message[]>('message:list', 12000);
+    setState((s) => ({
+      ...s,
+      messages: [...s.messages.filter((m) => m.chatId !== chatId), ...msgs],
+    }));
+  }, []);
 
   useEffect(() => {
     const offMessage = wsService.on('message:receive', (incoming: Message) => {
-      setState((s) => ({
-        ...s,
-        messages: [...s.messages, incoming],
-        chats: s.chats.map((c) => (c.id === incoming.chatId ? { ...c, lastMessage: incoming } : c)),
-      }));
+      setState((s) => {
+        const deduped = s.messages.some((m) => m.id === incoming.id) ? s.messages : [...s.messages, incoming];
+        return {
+          ...s,
+          messages: deduped,
+          chats: s.chats.map((c) => (c.id === incoming.chatId ? { ...c, lastMessage: incoming } : c)),
+        };
+      });
     });
 
     const offPresence = wsService.on('presence:update', ({ userId, status }: { userId: string; status: User['status'] }) => {
+      setAllUsers((users) => users.map((u) => (u.id === userId ? { ...u, status } : u)));
       setState((s) => ({
         ...s,
         chats: s.chats.map((chat) => ({
@@ -60,49 +85,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
     });
 
+    const offChatCreated = wsService.on('chat:created', (chat: Chat) => {
+      setState((s) => {
+        if (s.chats.some((c) => c.id === chat.id)) {
+          return { ...s, activeChat: chat };
+        }
+        return { ...s, chats: [chat, ...s.chats], activeChat: chat };
+      });
+    });
+
+    const offChatUpdated = wsService.on('chat:updated', (chat: Chat) => {
+      setState((s) => ({
+        ...s,
+        chats: s.chats.map((c) => (c.id === chat.id ? chat : c)),
+        activeChat: s.activeChat?.id === chat.id ? chat : s.activeChat,
+      }));
+    });
+
     return () => {
       offMessage();
       offPresence();
+      offChatCreated();
+      offChatUpdated();
     };
   }, []);
 
   const login = useCallback(async (user: User) => {
     await connectWithToken();
     setState((s) => ({ ...s, user }));
-  }, []);
+    await Promise.all([loadUsers(), loadChats()]);
+  }, [loadChats, loadUsers]);
 
   const logout = useCallback(() => {
     logoutAuth();
-    setState((s) => ({ ...s, user: null, activeChat: null }));
+    setState({
+      user: null,
+      chats: [],
+      messages: [],
+      activeChat: null,
+      inCall: false,
+      callChatId: null,
+      callType: null,
+    });
+    setAllUsers([]);
   }, []);
 
   const setActiveChat = useCallback((chat: Chat | null) => {
     setState((s) => ({ ...s, activeChat: chat }));
-  }, []);
+    if (chat) {
+      void loadMessagesForChat(chat.id);
+    }
+  }, [loadMessagesForChat]);
 
   const sendMessage = useCallback((chatId: string, content: string, kind: Message['kind'] = 'text') => {
-    const msg: Message = {
-      id: `m${Date.now()}`,
-      chatId,
-      senderId: state.user?.id || 'u1',
-      kind,
-      content,
-      createdAt: Date.now(),
-    };
-    setState((s) => ({
-      ...s,
-      messages: [...s.messages, msg],
-      chats: s.chats.map((c) =>
-        c.id === chatId ? { ...c, lastMessage: msg } : c
-      ),
-    }));
     wsService.send('message:send', { chatId, kind, content });
-  }, [state.user?.id]);
+  }, []);
 
   const startCall = useCallback((chatId: string, type: CallType = 'video') => {
     setState((s) => ({ ...s, inCall: true, callChatId: chatId, callType: type }));
     wsService.send('rtc:signal', { type: 'offer', chatId, fromUserId: state.user?.id, payload: null, callType: type });
-  }, []);
+  }, [state.user?.id]);
 
   const endCall = useCallback(() => {
     if (state.callChatId) {
@@ -112,65 +154,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state.callChatId, state.user?.id]);
 
   const createGroup = useCallback((title: string, description?: string, memberIds: string[] = []) => {
-    const me = state.user || currentUser;
-    const invitedUsers = mockUsers.filter((u) => memberIds.includes(u.id));
-    const newChat: Chat = {
-      id: `c${Date.now()}`,
-      type: 'group',
-      title,
-      description,
-      members: [me, ...invitedUsers],
-    };
-    setState((s) => ({ ...s, chats: [...s.chats, newChat], activeChat: newChat }));
     wsService.send('group:create', { title, description, memberIds });
-  }, [state.user]);
+  }, []);
 
   const createDirectChat = useCallback((targetUserId: string) => {
     wsService.send('chat:createDirect', { userId: targetUserId });
-    setState((s) => {
-      const me = s.user || currentUser;
-      // Check if direct chat already exists
-      const existing = s.chats.find(
-        (c) => c.type === 'direct' && c.members.some((m) => m.id === targetUserId)
-      );
-      if (existing) {
-        return { ...s, activeChat: existing };
-      }
-      const targetUser = mockUsers.find((u) => u.id === targetUserId);
-      if (!targetUser) return s;
-      const newChat: Chat = {
-        id: `c${Date.now()}`,
-        type: 'direct',
-        title: targetUser.displayName,
-        members: [me, targetUser],
-      };
-      return { ...s, chats: [...s.chats, newChat], activeChat: newChat };
-    });
   }, []);
 
   const inviteToGroup = useCallback((groupId: string, userIds: string[]) => {
     wsService.send('group:invite', { groupId, userIds });
-    setState((s) => {
-      const usersToAdd = mockUsers.filter((u) => userIds.includes(u.id));
-      const updatedChats = s.chats.map((c) => {
-        if (c.id !== groupId) return c;
-        const existingIds = new Set(c.members.map((m) => m.id));
-        const newMembers = usersToAdd.filter((u) => !existingIds.has(u.id));
-        return { ...c, members: [...c.members, ...newMembers] };
-      });
-      const updatedActive = s.activeChat?.id === groupId
-        ? updatedChats.find((c) => c.id === groupId) || s.activeChat
-        : s.activeChat;
-      return { ...s, chats: updatedChats, activeChat: updatedActive };
-    });
   }, []);
 
   const updateStatus = useCallback((status: User['status']) => {
     wsService.send('presence:update', { status });
-    setState((s) => {
-      if (!s.user) return s;
-      return { ...s, user: { ...s.user, status } };
-    });
+    setState((s) => (s.user ? { ...s, user: { ...s.user, status } } : s));
   }, []);
 
   return (
@@ -187,7 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         createDirectChat,
         inviteToGroup,
         updateStatus,
-        allUsers: mockUsers,
+        allUsers,
       }}
     >
       {children}

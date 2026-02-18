@@ -1,47 +1,58 @@
 package com.connectchat.service;
 
 import com.connectchat.model.User;
+import com.connectchat.model.UserEntity;
+import com.connectchat.repository.UserRepository;
 import com.connectchat.security.JwtService;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
-  private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+  private final BCryptPasswordEncoder encoder;
   private final JwtService jwtService;
+  private final UserRepository userRepository;
 
-  private final Map<String, String> byUsername = new ConcurrentHashMap<>();
-  private final Map<String, User> users = new ConcurrentHashMap<>();
-  private final Map<String, String> hashes = new ConcurrentHashMap<>();
-
-  public AuthService(JwtService jwtService) {
+  public AuthService(BCryptPasswordEncoder encoder, JwtService jwtService, UserRepository userRepository) {
+    this.encoder = encoder;
     this.jwtService = jwtService;
+    this.userRepository = userRepository;
   }
 
-  public User register(String username, String displayName, String password) {
-    if (byUsername.containsKey(username)) {
+  @Transactional
+  public User register(String username, String displayName, String email, String password) {
+    if (userRepository.existsByUsername(username)) {
       throw new IllegalArgumentException("username ya existe");
     }
-    var id = UUID.randomUUID().toString();
-    var user = new User(id, username, displayName, null, "online");
-    users.put(id, user);
-    byUsername.put(username, id);
-    hashes.put(id, encoder.encode(password));
-    return user;
+
+    UserEntity entity = new UserEntity();
+    entity.setId(UUID.randomUUID().toString());
+    entity.setUsername(username);
+    entity.setDisplayName(displayName);
+    entity.setEmail(email);
+    entity.setStatus("online");
+    entity.setPasswordHash(encoder.encode(password));
+
+    UserEntity saved = userRepository.save(entity);
+    return toPublicUser(saved);
   }
 
+  @Transactional
   public User login(String usernameOrEmail, String password) {
-    var userId = byUsername.get(usernameOrEmail);
-    if (userId == null) {
-      throw new IllegalArgumentException("usuario no encontrado");
-    }
-    if (!encoder.matches(password, hashes.get(userId))) {
+    UserEntity entity = userRepository
+        .findByUsernameOrEmail(usernameOrEmail, usernameOrEmail)
+        .orElseThrow(() -> new IllegalArgumentException("usuario no encontrado"));
+
+    if (!encoder.matches(password, entity.getPasswordHash())) {
       throw new IllegalArgumentException("credenciales invalidas");
     }
-    return users.get(userId);
+
+    entity.setStatus("online");
+    userRepository.save(entity);
+
+    return toPublicUser(entity);
   }
 
   public String tokenFor(User user) {
@@ -53,6 +64,16 @@ public class AuthService {
   }
 
   public User userById(String userId) {
-    return users.get(userId);
+    return userRepository.findById(userId).map(this::toPublicUser).orElse(null);
+  }
+
+  private User toPublicUser(UserEntity entity) {
+    return new User(
+        entity.getId(),
+        entity.getUsername(),
+        entity.getDisplayName(),
+        entity.getAvatarUrl(),
+        entity.getStatus()
+    );
   }
 }

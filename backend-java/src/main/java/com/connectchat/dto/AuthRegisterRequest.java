@@ -1,3 +1,3 @@
 package com.connectchat.dto;
 
-public record AuthRegisterRequest(String username, String displayName, String password) {}
+public record AuthRegisterRequest(String username, String displayName, String email, String password) {}

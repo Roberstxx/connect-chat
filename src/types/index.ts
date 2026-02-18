@@ -40,9 +40,13 @@ export type WsEvent =
   | 'auth:register'
   | 'chat:list'
   | 'chat:createDirect'
+  | 'chat:created'
+  | 'chat:updated'
+  | 'user:list'
   | 'group:create'
   | 'group:invite'
   | 'message:send'
   | 'message:receive'
+  | 'message:list'
   | 'rtc:signal'
   | 'presence:update';
