@@ -1,95 +1,206 @@
-# Welcome to your Lovable project
+# Connect Chat — Guía completa de instalación y ejecución
 
-## Project info
+Este repositorio tiene **2 partes**:
+- **Frontend**: React + Vite (`/`)
+- **Backend**: Java Spring Boot con WebSocket (`/backend-java`)
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## 1) Requisitos (qué debes instalar)
 
-There are several ways of editing your application.
+### Frontend
+- **Node.js 20+** (recomendado LTS)
+- **npm** (viene con Node)
 
-**Use Lovable**
+### Backend
+- **Java 17+**
+- **Maven 3.9+**
+- **MySQL 8+** o **MariaDB 10.4+**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Opcional (si quieres HTTPS/WSS en local)
+- **mkcert**
 
-Changes made via Lovable will be committed automatically to this repo.
+> Nota importante sobre "requirements.txt": este proyecto **no usa Python**, así que no hay `requirements.txt`.
+> - Las dependencias del frontend están en `package.json`.
+> - Las dependencias del backend están en `backend-java/pom.xml`.
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 2) Clonar e instalar dependencias
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+git clone <TU_REPO>
+cd connect-chat
+npm install
 ```
 
-**Edit a file directly in GitHub**
+Para backend, Maven descarga dependencias automáticamente al correrlo.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 3) Configurar base de datos (`chatapp`)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Levanta MySQL/MariaDB.
+2. Importa el esquema:
 
-## What technologies are used for this project?
+```bash
+cd backend-java
+mysql -u root -p chatapp < src/main/resources/db/schema.sql
+```
 
-This project is built with:
+> Si tu usuario/clave de DB son diferentes, luego actualiza `backend-java/src/main/resources/application.yml`.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Configuración actual por defecto del backend:
+- DB: `chatapp`
+- Usuario: `root`
+- Password: `root`
+- Puerto DB: `3306`
 
-## Backend Java (WebSocket + WebRTC signaling)
+---
 
-Se agregó un backend base en `backend-java/` con Spring Boot para:
+## 4) Configurar variables `.env` del frontend
 
-- login/register por WebSocket con JWT,
-- relay de señalización WebRTC (`rtc:signal`),
-- esquema MySQL completo para users/chats/messages/groups/rtc_sessions.
+En la raíz del proyecto crea un archivo **`.env`**.
 
-### Variables frontend
+### Opción A: sin SSL (más simple para desarrollo)
 
-Crear `.env` con:
-
-```sh
+```env
 VITE_WS_URL=ws://localhost:8443/ws/chat
 ```
 
-Si habilitas mkcert + SSL en backend:
+### Opción B: con SSL/TLS local (WSS)
 
-```sh
+```env
 VITE_WS_URL=wss://localhost:8443/ws/chat
 ```
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 5) (Opcional) Generar certificados locales con mkcert
 
-## Can I connect a custom domain to my Lovable project?
+Solo si quieres usar `wss://`.
 
-Yes, you can!
+### 5.1 Instalar autoridad local
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```bash
+mkcert -install
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### 5.2 Generar cert y key para localhost
+
+```bash
+mkcert localhost 127.0.0.1 ::1
+```
+
+Esto te genera dos archivos (nombres similares a):
+- `localhost+2.pem`
+- `localhost+2-key.pem`
+
+### 5.3 Convertir a `.p12` para Spring Boot
+
+Desde la carpeta donde quedaron los PEM:
+
+```bash
+openssl pkcs12 -export \
+  -in localhost+2.pem \
+  -inkey localhost+2-key.pem \
+  -out localhost.p12 \
+  -name localhost \
+  -password pass:changeit
+```
+
+### 5.4 Copiar `localhost.p12` al backend
+
+```bash
+cp localhost.p12 backend-java/src/main/resources/localhost.p12
+```
+
+### 5.5 Habilitar SSL en backend
+
+Edita `backend-java/src/main/resources/application.yml` y deja:
+
+```yaml
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: classpath:localhost.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+```
+
+---
+
+## 6) Correr backend (Spring Boot)
+
+En una terminal:
+
+```bash
+cd backend-java
+mvn spring-boot:run
+```
+
+Endpoint WebSocket:
+- Sin SSL: `ws://localhost:8443/ws/chat`
+- Con SSL: `wss://localhost:8443/ws/chat`
+
+---
+
+## 7) Correr frontend (Vite)
+
+En otra terminal, desde la raíz:
+
+```bash
+npm run dev
+```
+
+Vite normalmente abre en:
+- `http://localhost:5173`
+
+---
+
+## 8) Orden recomendado de arranque
+
+1. Base de datos MySQL/MariaDB.
+2. Backend (`mvn spring-boot:run`).
+3. Frontend (`npm run dev`).
+4. Abrir el navegador en `http://localhost:5173`.
+
+---
+
+## 9) Comandos útiles
+
+### Frontend
+```bash
+npm run dev
+npm run build
+npm run test
+npm run lint
+```
+
+### Backend
+```bash
+cd backend-java
+mvn spring-boot:run
+mvn test
+```
+
+---
+
+## 10) Si algo falla (checklist rápido)
+
+- ¿La DB `chatapp` existe y el schema fue importado?
+- ¿Credenciales de DB correctas en `application.yml`?
+- ¿`VITE_WS_URL` coincide con `ws://` o `wss://` según tu backend?
+- Si usas SSL: ¿`localhost.p12` está en `backend-java/src/main/resources/` y `ssl.enabled: true`?
+- ¿Backend corriendo en puerto `8443`?
+- ¿Frontend corriendo en puerto `5173`?
+
+---
+
+## Estructura principal
+
+- Frontend: `src/`
+- Backend: `backend-java/src/main/java`
+- Config backend: `backend-java/src/main/resources/application.yml`
+- Schema DB: `backend-java/src/main/resources/db/schema.sql`
