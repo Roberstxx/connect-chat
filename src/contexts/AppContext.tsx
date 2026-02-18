@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { User, Chat, Message } from '@/types';
+import { User, Chat, Message, CallType } from '@/types';
 import { currentUser, mockChats, mockMessages, mockUsers } from '@/data/mock';
 
 interface AppState {
@@ -9,6 +9,7 @@ interface AppState {
   activeChat: Chat | null;
   inCall: boolean;
   callChatId: string | null;
+  callType: CallType | null;
 }
 
 interface AppContextType extends AppState {
@@ -16,9 +17,9 @@ interface AppContextType extends AppState {
   logout: () => void;
   setActiveChat: (chat: Chat | null) => void;
   sendMessage: (chatId: string, content: string, kind?: Message['kind']) => void;
-  startCall: (chatId: string) => void;
+  startCall: (chatId: string, type?: CallType) => void;
   endCall: () => void;
-  createGroup: (title: string, description?: string) => void;
+  createGroup: (title: string, description?: string, memberIds?: string[]) => void;
   createDirectChat: (targetUserId: string) => void;
   inviteToGroup: (groupId: string, userIds: string[]) => void;
   updateStatus: (status: User['status']) => void;
@@ -35,6 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     activeChat: null,
     inCall: false,
     callChatId: null,
+    callType: null,
   });
 
   const login = useCallback((user: User) => {
@@ -68,25 +70,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // TODO: wsService.send('message:send', { chatId, kind, content });
   }, [state.user?.id]);
 
-  const startCall = useCallback((chatId: string) => {
-    setState((s) => ({ ...s, inCall: true, callChatId: chatId }));
+  const startCall = useCallback((chatId: string, type: CallType = 'video') => {
+    setState((s) => ({ ...s, inCall: true, callChatId: chatId, callType: type }));
+    // TODO: wsService.send('rtc:signal', { type: 'offer', chatId, fromUserId: state.user?.id, payload: null });
   }, []);
 
   const endCall = useCallback(() => {
-    setState((s) => ({ ...s, inCall: false, callChatId: null }));
+    setState((s) => ({ ...s, inCall: false, callChatId: null, callType: null }));
   }, []);
 
-  const createGroup = useCallback((title: string, description?: string) => {
+  const createGroup = useCallback((title: string, description?: string, memberIds: string[] = []) => {
     const me = state.user || currentUser;
+    const invitedUsers = mockUsers.filter((u) => memberIds.includes(u.id));
     const newChat: Chat = {
       id: `c${Date.now()}`,
       type: 'group',
       title,
       description,
-      members: [me],
+      members: [me, ...invitedUsers],
     };
     setState((s) => ({ ...s, chats: [...s.chats, newChat], activeChat: newChat }));
-    // TODO: wsService.send('group:create', { title, description });
+    // TODO: wsService.send('group:create', { title, description, memberIds });
   }, [state.user]);
 
   const createDirectChat = useCallback((targetUserId: string) => {
