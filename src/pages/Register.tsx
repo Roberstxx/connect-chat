@@ -27,7 +27,7 @@ export default function Register() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     try {
       setSubmitting(true);
-      const { user } = await registerWithWs(form.username, form.name, form.password);
+      const { user } = await registerWithWs(form.username, form.name, form.email, form.password);
       await login(user);
       navigate('/app');
     } catch {
