@@ -224,8 +224,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state.chats, state.user?.id]);
 
   const endCall = useCallback(() => {
-    if (state.callChatId) {
-      wsService.send('rtc:signal', { type: 'end', chatId: state.callChatId, fromUserId: state.user?.id, toUserId: state.callPeerId, payload: null });
+    if (state.callChatId && state.user?.id) {
+      const chat = state.chats.find((c) => c.id === state.callChatId);
+      const peers = chat?.members.filter((member) => member.id !== state.user?.id) || [];
+      peers.forEach((peer) => {
+        wsService.send('rtc:signal', {
+          type: 'end',
+          chatId: state.callChatId,
+          fromUserId: state.user?.id,
+          toUserId: peer.id,
+          payload: null,
+        });
+      });
     }
     setState((s) => ({
       ...s,
@@ -236,7 +246,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isCallInitiator: false,
       incomingCall: null,
     }));
-  }, [state.callChatId, state.callPeerId, state.user?.id]);
+  }, [state.callChatId, state.chats, state.user?.id]);
 
   const acceptIncomingCall = useCallback(() => {
     if (!state.incomingCall || !state.user) return;
