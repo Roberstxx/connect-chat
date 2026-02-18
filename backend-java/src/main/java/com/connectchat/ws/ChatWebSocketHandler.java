@@ -62,7 +62,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         )));
       }
     } catch (IllegalArgumentException ex) {
-      sendEvent(session, "error", Map.of("message", ex.getMessage()));
+      sendEvent(session, "error", Map.of("message", ex.getMessage(), "event", event));
     }
   }
 

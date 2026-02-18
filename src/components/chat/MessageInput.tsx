@@ -1,13 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Send, Smile } from 'lucide-react';
+import { Send, Smile, Sparkles } from 'lucide-react';
 
-const QUICK_EMOJIS = ['😀', '😂', '❤️', '👍', '🔥', '🎉', '😎', '🙌', '💯', '🤔', '😢', '👋'];
+const EMOJI_LIBRARY = {
+  favoritos: ['😀', '😂', '❤️', '👍', '🔥', '🎉', '😎', '🙌', '💯', '🤔', '😢', '👋'],
+  personas: ['😊', '😁', '😅', '😉', '😍', '😘', '😴', '🤗', '🤩', '🤝', '🙏', '🫶', '😇', '🤯', '🥳', '😭'],
+  reaccion: ['✅', '❌', '⚠️', '👏', '👌', '💪', '🫡', '👀', '🤨', '😡', '😱', '😬', '🤭', '😮‍💨', '😴', '🤒'],
+  trabajo: ['💻', '📌', '📅', '📎', '🧠', '✍️', '📢', '🔔', '📊', '📈', '🧩', '📦', '⚙️', '🛠️', '🔒', '🧾'],
+  fiesta: ['🥳', '🎊', '🎈', '🍕', '🍔', '🍩', '☕', '🍺', '🎮', '🎵', '🎬', '🏆', '⚽', '🏀', '🚀', '🌟'],
+};
+
+const EMOJI_SECTIONS = Object.entries(EMOJI_LIBRARY);
 
 export default function MessageInput() {
   const { activeChat, sendMessage } = useApp();
   const [text, setText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
+  const [activeSection, setActiveSection] = useState<(typeof EMOJI_SECTIONS)[number][0]>('favoritos');
   const inputRef = useRef<HTMLInputElement>(null);
 
   if (!activeChat) return null;
@@ -37,17 +46,31 @@ export default function MessageInput() {
   return (
     <div className="relative px-4 py-3 border-t border-border bg-card shrink-0">
       {showEmoji && (
-        <div className="absolute bottom-full left-4 mb-2 p-3 bg-popover border border-border rounded-xl shadow-lg grid grid-cols-6 gap-2 animate-fade-in">
-          {QUICK_EMOJIS.map((e) => (
-            <button
-              key={e}
-              onClick={() => handleEmoji(e)}
-              className="text-xl hover:scale-125 transition-transform p-1"
-              aria-label={`Emoji ${e}`}
-            >
-              {e}
-            </button>
-          ))}
+        <div className="absolute bottom-full left-4 mb-2 w-[min(92vw,430px)] p-3 bg-popover border border-border rounded-xl shadow-lg animate-fade-in">
+          <div className="flex items-center gap-2 mb-2 overflow-x-auto scrollbar-thin pb-1">
+            {EMOJI_SECTIONS.map(([section, emojis]) => (
+              <button
+                key={section}
+                onClick={() => setActiveSection(section)}
+                className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition-colors ${activeSection === section ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+              >
+                {section} {emojis[0]}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-8 gap-1.5 max-h-44 overflow-y-auto scrollbar-thin pr-1">
+            {EMOJI_LIBRARY[activeSection].map((emoji) => (
+              <button
+                key={`${activeSection}-${emoji}`}
+                onClick={() => handleEmoji(emoji)}
+                className="text-xl hover:scale-125 transition-transform p-1"
+                aria-label={`Emoji ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div className="flex items-center gap-2">
@@ -56,7 +79,7 @@ export default function MessageInput() {
           className={`p-2.5 rounded-lg transition-colors ${showEmoji ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
           aria-label="Emojis"
         >
-          <Smile className="w-5 h-5" />
+          {showEmoji ? <Sparkles className="w-5 h-5" /> : <Smile className="w-5 h-5" />}
         </button>
         <input
           ref={inputRef}
