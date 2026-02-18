@@ -23,8 +23,13 @@ export async function connectWithToken(token?: string) {
   await wsService.connect(buildUrlWithToken(token || getStoredToken() || undefined));
 }
 
+async function connectForAuth() {
+  // Login/registro deben abrir sin token para evitar bucles si hay un JWT viejo/inválido guardado.
+  await wsService.connect(WS_BASE);
+}
+
 export async function loginWithWs(usernameOrEmail: string, password: string): Promise<AuthResponse> {
-  await connectWithToken();
+  await connectForAuth();
   const responsePromise = wsService.once<AuthResponse>('auth:login', 12000);
   wsService.send('auth:login', { usernameOrEmail, password });
   const response = await responsePromise;
@@ -33,7 +38,7 @@ export async function loginWithWs(usernameOrEmail: string, password: string): Pr
 }
 
 export async function registerWithWs(username: string, displayName: string, password: string): Promise<AuthResponse> {
-  await connectWithToken();
+  await connectForAuth();
   const responsePromise = wsService.once<AuthResponse>('auth:register', 12000);
   wsService.send('auth:register', { username, displayName, password });
   const response = await responsePromise;

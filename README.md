@@ -45,7 +45,7 @@ Para backend, Maven descarga dependencias automáticamente al correrlo.
 
 ```bash
 cd backend-java
-mysql -u root -p chatapp < src/main/resources/db/schema.sql
+mysql -u root chatapp < src/main/resources/db/schema.sql
 ```
 
 > Si tu usuario/clave de DB son diferentes, luego actualiza `backend-java/src/main/resources/application.yml`.

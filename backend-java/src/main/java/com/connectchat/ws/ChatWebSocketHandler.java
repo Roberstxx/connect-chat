@@ -80,9 +80,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   public void afterConnectionEstablished(WebSocketSession session) throws Exception {
     var token = (String) session.getAttributes().get("token");
     if (token != null) {
-      var userId = authService.userIdFromToken(token);
-      session.getAttributes().put("userId", userId);
-      registry.bind(userId, session);
+      try {
+        var userId = authService.userIdFromToken(token);
+        session.getAttributes().put("userId", userId);
+        registry.bind(userId, session);
+      } catch (RuntimeException ignored) {
+        // Token inválido/expirado: mantenemos la conexión abierta para permitir auth:login/auth:register.
+        session.getAttributes().remove("token");
+      }
     }
     super.afterConnectionEstablished(session);
   }
