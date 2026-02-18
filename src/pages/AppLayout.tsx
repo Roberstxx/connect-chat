@@ -9,10 +9,10 @@ import GroupModal from '@/components/chat/GroupModal';
 import GroupInfoPanel from '@/components/chat/GroupInfoPanel';
 import DirectInfoPanel from '@/components/chat/DirectInfoPanel';
 import NewDirectChatModal from '@/components/chat/NewDirectChatModal';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Phone, Video } from 'lucide-react';
 
 export default function AppLayout() {
-  const { activeChat } = useApp();
+  const { activeChat, incomingCall, chats, allUsers, acceptIncomingCall, declineIncomingCall } = useApp();
   const [groupModal, setGroupModal] = useState(false);
   const [directModal, setDirectModal] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -22,8 +22,12 @@ export default function AppLayout() {
     setInfoOpen(false);
   }, [activeChat?.id]);
 
+
+  const incomingChat = incomingCall ? chats.find((chat) => chat.id === incomingCall.chatId) : null;
+  const callerUser = incomingCall ? allUsers.find((u) => u.id === incomingCall.fromUserId) : null;
+
   return (
-    <div className="h-screen flex bg-background">
+    <div className="h-screen flex bg-background relative">
       <ChatSidebar
         onNewGroup={() => setGroupModal(true)}
         onNewDirect={() => setDirectModal(true)}
@@ -58,6 +62,33 @@ export default function AppLayout() {
           <DirectInfoPanel open={infoOpen} onClose={() => setInfoOpen(false)} />
         )}
       </main>
+
+
+      {incomingCall && (
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-[60] rounded-2xl border border-border bg-card shadow-xl px-4 py-3 min-w-[320px]">
+          <p className="text-sm font-semibold text-foreground">
+            Llamada entrante {incomingCall.callType === 'video' ? 'de video' : 'de voz'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {callerUser?.displayName || 'Usuario'} · {incomingChat?.title || 'Chat'}
+          </p>
+          <div className="flex gap-2 mt-3 justify-end">
+            <button
+              onClick={declineIncomingCall}
+              className="px-3 py-2 rounded-lg text-sm bg-muted text-muted-foreground hover:opacity-80"
+            >
+              Rechazar
+            </button>
+            <button
+              onClick={acceptIncomingCall}
+              className="px-3 py-2 rounded-lg text-sm bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-90"
+            >
+              {incomingCall.callType === 'video' ? <Video className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+              Contestar
+            </button>
+          </div>
+        </div>
+      )}
 
       <CallOverlay />
       <GroupModal open={groupModal} onClose={() => setGroupModal(false)} />

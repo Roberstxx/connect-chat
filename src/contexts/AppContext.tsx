@@ -11,6 +11,13 @@ interface AppState {
   inCall: boolean;
   callChatId: string | null;
   callType: CallType | null;
+  callPeerId: string | null;
+  isCallInitiator: boolean;
+  incomingCall: {
+    chatId: string;
+    fromUserId: string;
+    callType: CallType;
+  } | null;
 }
 
 interface AppContextType extends AppState {
@@ -20,6 +27,8 @@ interface AppContextType extends AppState {
   sendMessage: (chatId: string, content: string, kind?: Message['kind']) => void;
   startCall: (chatId: string, type?: CallType) => void;
   endCall: () => void;
+  acceptIncomingCall: () => void;
+  declineIncomingCall: () => void;
   createGroup: (title: string, description?: string, memberIds?: string[]) => void;
   createDirectChat: (targetUserId: string) => void;
   inviteToGroup: (groupId: string, userIds: string[]) => void;
@@ -38,6 +47,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     inCall: false,
     callChatId: null,
     callType: null,
+    callPeerId: null,
+    isCallInitiator: false,
+    incomingCall: null,
   });
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
@@ -102,11 +114,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
     });
 
+    const offRtcSignal = wsService.on('rtc:signal', (signal: any) => {
+      setState((s) => {
+        if (signal?.type === 'offer' && signal?.payload?.kind === 'invite') {
+          if (s.inCall) return s;
+          return {
+            ...s,
+            incomingCall: {
+              chatId: signal.chatId,
+              fromUserId: signal.fromUserId,
+              callType: signal.callType || 'audio',
+            },
+          };
+        }
+
+        if (signal?.type === 'end') {
+          if (s.callChatId === signal.chatId || s.incomingCall?.chatId === signal.chatId) {
+            return {
+              ...s,
+              inCall: false,
+              callChatId: null,
+              callType: null,
+              callPeerId: null,
+              isCallInitiator: false,
+              incomingCall: null,
+            };
+          }
+        }
+
+        if (signal?.type === 'answer' && signal?.payload?.kind === 'accept' && s.callChatId === signal.chatId) {
+          return {
+            ...s,
+            callPeerId: signal.fromUserId,
+          };
+        }
+
+        return s;
+      });
+    });
+
     return () => {
       offMessage();
       offPresence();
       offChatCreated();
       offChatUpdated();
+      offRtcSignal();
     };
   }, []);
 
@@ -126,6 +178,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       inCall: false,
       callChatId: null,
       callType: null,
+      callPeerId: null,
+      isCallInitiator: false,
+      incomingCall: null,
     });
     setAllUsers([]);
   }, []);
@@ -142,16 +197,91 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startCall = useCallback((chatId: string, type: CallType = 'video') => {
-    setState((s) => ({ ...s, inCall: true, callChatId: chatId, callType: type }));
-    wsService.send('rtc:signal', { type: 'offer', chatId, fromUserId: state.user?.id, payload: null, callType: type });
-  }, [state.user?.id]);
+    const chat = state.chats.find((c) => c.id === chatId);
+    const peers = chat?.members.filter((member) => member.id !== state.user?.id) || [];
+    const primaryPeerId = peers[0]?.id || null;
+
+    setState((s) => ({
+      ...s,
+      inCall: true,
+      callChatId: chatId,
+      callType: type,
+      callPeerId: primaryPeerId,
+      isCallInitiator: true,
+      incomingCall: null,
+    }));
+
+    peers.forEach((peer) => {
+      wsService.send('rtc:signal', {
+        type: 'offer',
+        chatId,
+        fromUserId: state.user?.id,
+        toUserId: peer.id,
+        payload: { kind: 'invite' },
+        callType: type,
+      });
+    });
+  }, [state.chats, state.user?.id]);
 
   const endCall = useCallback(() => {
-    if (state.callChatId) {
-      wsService.send('rtc:signal', { type: 'end', chatId: state.callChatId, fromUserId: state.user?.id, payload: null });
+    if (state.callChatId && state.user?.id) {
+      const chat = state.chats.find((c) => c.id === state.callChatId);
+      const peers = chat?.members.filter((member) => member.id !== state.user?.id) || [];
+      peers.forEach((peer) => {
+        wsService.send('rtc:signal', {
+          type: 'end',
+          chatId: state.callChatId,
+          fromUserId: state.user?.id,
+          toUserId: peer.id,
+          payload: null,
+        });
+      });
     }
-    setState((s) => ({ ...s, inCall: false, callChatId: null, callType: null }));
-  }, [state.callChatId, state.user?.id]);
+    setState((s) => ({
+      ...s,
+      inCall: false,
+      callChatId: null,
+      callType: null,
+      callPeerId: null,
+      isCallInitiator: false,
+      incomingCall: null,
+    }));
+  }, [state.callChatId, state.chats, state.user?.id]);
+
+  const acceptIncomingCall = useCallback(() => {
+    if (!state.incomingCall || !state.user) return;
+
+    wsService.send('rtc:signal', {
+      type: 'answer',
+      chatId: state.incomingCall.chatId,
+      fromUserId: state.user.id,
+      toUserId: state.incomingCall.fromUserId,
+      payload: { kind: 'accept' },
+    });
+
+    setState((s) => ({
+      ...s,
+      inCall: true,
+      callChatId: s.incomingCall?.chatId || null,
+      callType: s.incomingCall?.callType || null,
+      callPeerId: s.incomingCall?.fromUserId || null,
+      isCallInitiator: false,
+      incomingCall: null,
+    }));
+  }, [state.incomingCall, state.user]);
+
+  const declineIncomingCall = useCallback(() => {
+    if (state.incomingCall && state.user) {
+      wsService.send('rtc:signal', {
+        type: 'end',
+        chatId: state.incomingCall.chatId,
+        fromUserId: state.user.id,
+        toUserId: state.incomingCall.fromUserId,
+        payload: { kind: 'decline' },
+      });
+    }
+    setState((s) => ({ ...s, incomingCall: null }));
+  }, [state.incomingCall, state.user]);
 
   const createGroup = useCallback((title: string, description?: string, memberIds: string[] = []) => {
     wsService.send('group:create', { title, description, memberIds });
@@ -180,6 +310,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sendMessage,
         startCall,
         endCall,
+        acceptIncomingCall,
+        declineIncomingCall,
         createGroup,
         createDirectChat,
         inviteToGroup,
